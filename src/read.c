@@ -1880,14 +1880,13 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
   int numCompleted = 0;
 
   faread_struct *fas = installFastaReader(fname, uppercaseOnly);
-  // while (fastaReader(fas))
-  // {
-  //   numElements++;
-  // }
-  // freeFastaReader(fas);
-  numElements = 100;
+  while (fastaReader(fas))
+  {
+    numElements++;
+  }
+  freeFastaReader(fas);
 
-  // fas = installFastaReader(fname, uppercaseOnly);
+  fas = installFastaReader(fname, uppercaseOnly);
   int pamlen = strlen(pam);
   int guidelen = PROTOSPACER_LENGTH + pamlen;
   FILE *outfh = open_file(outputName, "w");
