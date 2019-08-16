@@ -25,6 +25,7 @@ along with Crisflash.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <semaphore.h>
 
 #include "nary_tree.h"
 
@@ -108,9 +109,38 @@ struct arg_struct
   char strand;
 };
 
+
+struct ThreadInfo {
+  int threads;
+  int* numThreadsAvailable;
+  int* numCompleted;
+  int* numElements;
+  pthread_mutex_t * lock_p;
+  pthread_cond_t * cond_p;
+  pthread_cond_t * all_done_p;
+};
+
+
+struct GRNAsMatch {
+    trie* T;
+    grna_list* g;
+    int guidelen;
+    char* pam;
+    int maxMismatch;
+    FILE* outfh;
+    int outFileType;
+    struct ThreadInfo threadInfo;
+};
+
+
 /*************************/
 /*      FUNCTIONS        */
 /*************************/
+
+// Multithreading number of targets walking through tree concurrently 
+void *GRNAsMatchWrapper(void *args);
+int getAvailableThread(int list[], int len);
+
 
 double now();
 void readFaToTrie(trie *T, char *genomefname, char *pam, char* outputfname, int upper_case_only, int printGRNAs);

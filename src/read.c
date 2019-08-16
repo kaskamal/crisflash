@@ -1562,14 +1562,14 @@ void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxM
   for(i=0;i<g->pos;i++) {    
     // create gRNA sequence consisting protospacer sequence + PAM sequence.
     if(g->strands[i] == '+') {
-      for(j=0;j<PROTOSPACER_LENGTH;j++) {
-	grna[j]=g->pstrand[g->starts[i]+j];
+        for(j=0;j<PROTOSPACER_LENGTH;j++) {
+	      grna[j]=g->pstrand[g->starts[i]+j];
       }
     }
     else {
-      k=g->starts[i]+guidelen-1;
-      for(j=0;j<PROTOSPACER_LENGTH;j++) {
-	grna[j]=g->nstrand[k-j];
+        k=g->starts[i]+guidelen-1;
+        for(j=0;j<PROTOSPACER_LENGTH;j++) {
+	      grna[j]=g->nstrand[k-j];
       }
     }
     // add PAM sequence
@@ -1582,66 +1582,150 @@ void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxM
     while(!res) {
       if(tpos == nr_of_threads) { tpos = 0; }
       if(args_table[tpos].free > 0) {
-	// thread has been in use in past has completed, try to join
-	if(args_table[tpos].free == 1) {
-	  if (pthread_join(threads[tpos], &status)) {
-	    perror("pthread_join");
-	    exit(1);
-	  }
-	}
-	// load_args_table with relevant values
-	args_table[tpos].free = 0;
-	strcpy(args_table[tpos].grna, grna);
-	args_table[tpos].chr = g->chr;
-	args_table[tpos].start = g->starts[i];
-	args_table[tpos].end = g->starts[i] + T->readlen;
-	args_table[tpos].strand = g->strands[i];	
-	if(pthread_create(&threads[tpos], &attr, thread_worker, &args_table[tpos])) {
-	  perror("pthread_create");
-	  exit(1);
-	}
-	res = 1;
+	      // thread has been in use in past has completed, try to join
+        if(args_table[tpos].free == 1) {
+          if (pthread_join(threads[tpos], &status)) {
+            perror("pthread_join");
+            exit(1);
+          }
+        }
+        // load_args_table with relevant values
+        args_table[tpos].free = 0;
+        strcpy(args_table[tpos].grna, grna);
+        args_table[tpos].chr = g->chr;
+        args_table[tpos].start = g->starts[i];
+        args_table[tpos].end = g->starts[i] + T->readlen;
+        args_table[tpos].strand = g->strands[i];	
+        if(pthread_create(&threads[tpos], &attr, thread_worker, &args_table[tpos])) {
+          perror("pthread_create");
+          exit(1);
+        }
+        res = 1;
       }
       tpos++;
     } // end of while trying to find free thread to match gRNA candidate
   } // end of for loop for processing all gRNAs
 
-  // join the remaining threads
-  for(tpos=0;tpos<nr_of_threads; tpos++) {
-    if(args_table[tpos].free != 2) {
-      if (pthread_join(threads[tpos], &status)) {
-	perror("pthread_join");
-	exit(1);
+    // join the remaining threads
+    for(tpos=0;tpos<nr_of_threads; tpos++) {
+      if(args_table[tpos].free != 2) {
+        if (pthread_join(threads[tpos], &status)) {
+          perror("pthread_join");
+          exit(1);
+        }
       }
+      free(args_table[tpos].grna);
     }
-    free(args_table[tpos].grna);
-  }
-  // free grna
-  free(grna);
+    // free grna
+    free(grna);
 }
 
 void TrieAMatchSequenceThreads(trie* T, char* fname, int maxMismatch, char* outputName, int outFileType, char *pam, int uppercaseOnly, int threads, int printOnly)
 {
+  // Initialize threads & associated variables
+  pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t cond  = PTHREAD_COND_INITIALIZER;
+  pthread_cond_t all_done = PTHREAD_COND_INITIALIZER;
+
+  int numThreadsAvailable = threads;
+  int numElements = 0;
+  int numCompleted = 0;
+
   faread_struct *fas = installFastaReader(fname, uppercaseOnly);
+  while (fastaReader(fas)) {
+    numElements++;
+  }
+  freeFastaReader(fas);
+
+  fas = installFastaReader(fname, uppercaseOnly);
   grna_list *g;
   int pamlen = strlen(pam);
   int guidelen = PROTOSPACER_LENGTH+pamlen;
-
   FILE* outfh = open_file(outputName, "w");
-  
+
   while(fastaReader(fas)) {
     fprintf(stdout,"[crisflash] Processing %s (length %lld) in %s ...\n", fas->header, fas->slen, fname);
     fflush(stderr);
     fastaReaderImproveSequence(fas);
     g = fastaSequenceToGRNAs(fas->header, fas->s, fas->sr, fas->slen, pam);   
-    if(threads > 1) {
-      GRNAsMatchThreaded(T, g, guidelen, pam, maxMismatch, outfh, outFileType, threads);
+    if (threads > 1) {
+
+      // Wait if no threads are available
+      pthread_mutex_lock(&lock);
+      while (!numThreadsAvailable) {
+        pthread_cond_wait(&cond, &lock);
+      }
+      numThreadsAvailable--;
+
+      pthread_t pthread;
+
+      struct GRNAsMatch* args = malloc(sizeof(struct GRNAsMatch));
+
+      args->T = T;
+      args->g = g;
+      args->guidelen = guidelen; 
+      args->pam = pam;
+      args->maxMismatch = maxMismatch; 
+      args->outfh = outfh; 
+      args->outFileType = outFileType; 
+
+      args->threadInfo.threads = threads; 
+      args->threadInfo.numThreadsAvailable = &numThreadsAvailable;
+      args->threadInfo.numCompleted = &numCompleted;
+      args->threadInfo.numElements = &numElements;
+      args->threadInfo.lock_p = &lock;
+      args->threadInfo.cond_p = &cond;
+      args->threadInfo.all_done_p = &all_done;
+
+
+      pthread_create(&pthread, NULL, GRNAsMatchWrapper, args);
+      // GRNAsMatchThreaded(T, g, guidelen, pam, maxMismatch, outfh, outFileType, threads);
+
+      pthread_mutex_unlock(&lock);
     }
     else {
       GRNAsMatch(T, g, guidelen, pam, maxMismatch, outfh, outFileType);      
     }
-    freeGRNAs(g);
   }
+
+  pthread_mutex_lock(&lock);
+  while (numCompleted != numElements) {
+    pthread_cond_wait(&all_done, &lock);
+  }
+  pthread_mutex_unlock(&lock);
+  
   freeFastaReader(fas);
   fclose(outfh);
+}
+
+int getAvailableThread(int* list, int len) {
+  for (int i = 0; i < len; i++) {
+    if (list[i] == 1) {
+      list[i] = 0;
+      return i;
+    }
+  }
+  fprintf(stderr,"[crisflash] ERROR: No Threads Available!\n");
+  exit(1);
+}
+
+
+void *GRNAsMatchWrapper(void *args) {
+  struct GRNAsMatch* args_cast = (struct GRNAsMatch *) args;
+  GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads);
+  
+
+  pthread_mutex_lock(args_cast->threadInfo.lock_p);
+  *(args_cast->threadInfo.numThreadsAvailable) += 1;
+  *(args_cast->threadInfo.numCompleted) += 1;
+  pthread_cond_signal(args_cast->threadInfo.cond_p);
+  if (*(args_cast->threadInfo.numCompleted) == *(args_cast->threadInfo.numElements)) {
+    pthread_cond_signal(args_cast->threadInfo.all_done_p);
+  }
+  pthread_mutex_unlock(args_cast->threadInfo.lock_p);
+
+
+  freeGRNAs(args_cast->g);
+  free(args_cast);
+  pthread_detach(pthread_self());
 }
