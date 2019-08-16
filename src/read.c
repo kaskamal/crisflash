@@ -38,10 +38,16 @@ along with Crisflash.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "read.h"
 #include "nary_tree.h"
 #include "vcf.h"
+
+pthread_mutex_t write_lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+
 
 FILE *open_file(char *fname, char *mode)
 {
@@ -520,8 +526,12 @@ void updateSizeGRNAs(grna_list *g)
 
 void freeGRNAs(grna_list *g)
 {
+  // Free all pointers that belong only to g
   free(g->starts);
   free(g->strands);
+  free(g->pstrand);
+  free(g->nstrand);
+  free(g->chr);
   free(g);
 }
 
@@ -824,11 +834,20 @@ grna_list *fastaSequenceToGRNAs(char *header, char *s, char *sr, long long spos,
 {
 
   grna_list *glist = malloc(sizeof(grna_list));
-  glist->pstrand = s;
-  glist->nstrand = sr;
-  glist->chr = header;
+
+
+  glist->pstrand = malloc(sizeof(char) * (strlen(s) + 1));
+  strcpy(glist->pstrand, s);
+
+  glist->nstrand = malloc(sizeof(char) * (strlen(sr) + 1));
+  strcpy(glist->nstrand, sr);
+
+  glist->chr = malloc(sizeof(char) * (strlen(header) + 1));
+  strcpy(glist->chr, header);
+
   glist->length = 300000;
   glist->pos = 0;
+
   glist->starts = malloc(sizeof(long long) * glist->length);
   glist->strands = malloc(sizeof(char) * glist->length);
   int nfree;
@@ -1642,15 +1661,21 @@ void *thread_worker(void *arg)
   mcontainer *m = TrieAMatch(args_table->T, args_table->grna, args_table->T->readlen, args_table->maxMismatch);
   if (args_table->outFileType == 2)
   {
+    pthread_mutex_lock(&write_lock);
     writeInCasOffinder(args_table->outfh, args_table->grna, m, args_table->T, 0);
+    pthread_mutex_unlock(&write_lock);
   }
   else if (args_table->outFileType == 3)
   {
+    pthread_mutex_lock(&write_lock);
     writeInCasOffinder(args_table->outfh, args_table->grna, m, args_table->T, 1);
+    pthread_mutex_unlock(&write_lock);
   }
   else
   {
+    pthread_mutex_lock(&write_lock);
     writeInBed_lighter(args_table->outfh, m, args_table->chr, args_table->start, args_table->end, args_table->grna, args_table->strand, args_table->T);
+    pthread_mutex_unlock(&write_lock);
   }
   // mcontainer_print(m);
   mcontainer_free(m); // TrieAMatch creates a new container each time, so we have to free it here
@@ -1704,16 +1729,22 @@ void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch,
     m = TrieAMatch(T, grna, T->readlen, maxMismatch);
     if (outFileType == 2)
     {
+      pthread_mutex_lock(&write_lock);
       writeInCasOffinder(outfh, grna, m, T, 0);
+      pthread_mutex_unlock(&write_lock);
     }
     else if (outFileType == 3)
     {
+      pthread_mutex_lock(&write_lock);
       writeInCasOffinder(outfh, grna, m, T, 1);
+      pthread_mutex_unlock(&write_lock);
     }
     else
     {
       // i.e. outFileType==1; and default behaviour
+      pthread_mutex_lock(&write_lock);
       writeInBed_lighter(outfh, m, g->chr, g->starts[i], g->starts[i] + guidelen, grna, g->strands[i], T);
+      pthread_mutex_unlock(&write_lock);
     }
 
     mcontainer_free(m); // TrieAMatch creates a new container each time, so we have to free it here
@@ -1926,24 +1957,12 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
   fclose(outfh);
 }
 
-int getAvailableThread(int *list, int len)
-{
-  for (int i = 0; i < len; i++)
-  {
-    if (list[i] == 1)
-    {
-      list[i] = 0;
-      return i;
-    }
-  }
-  fprintf(stderr, "[crisflash] ERROR: No Threads Available!\n");
-  exit(1);
-}
-
 void *GRNAsMatchWrapper(void *args)
 {
   struct GRNAsMatch *args_cast = (struct GRNAsMatch *)args;
-  GRNAsMatch(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType);
+  GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads);
+  // GRNAsMatch(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType);
+
 
   pthread_mutex_lock(args_cast->threadInfo.lock_p);
   *(args_cast->threadInfo.numThreadsAvailable) += 1;
