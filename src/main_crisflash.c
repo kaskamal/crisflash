@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 	char * pam =  malloc(sizeof(char)*4);			     
 	strcpy(pam,"NGG");
 
-	while ((c = getopt(argc, argv, "ABCg:o:s:vV:m:t:lhp:")) != -1)
+	while ((c = getopt(argc, argv, "ABCg:o:s:vV:m:t:uhp:")) != -1)
 	  {
 	    switch (c)
 	      {		
