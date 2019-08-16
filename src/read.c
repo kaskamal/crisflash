@@ -1849,13 +1849,14 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
   int numCompleted = 0;
 
   faread_struct *fas = installFastaReader(fname, uppercaseOnly);
-  while (fastaReader(fas))
-  {
-    numElements++;
-  }
-  freeFastaReader(fas);
+  // while (fastaReader(fas))
+  // {
+  //   numElements++;
+  // }
+  // freeFastaReader(fas);
+  numElements = 100;
 
-  fas = installFastaReader(fname, uppercaseOnly);
+  // fas = installFastaReader(fname, uppercaseOnly);
   int pamlen = strlen(pam);
   int guidelen = PROTOSPACER_LENGTH + pamlen;
   FILE *outfh = open_file(outputName, "w");
@@ -1901,7 +1902,7 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
       args->threadInfo.all_done_p = &all_done;
 
       pthread_create(&pthread, NULL, GRNAsMatchWrapper, args);
-
+      
       pthread_mutex_unlock(&lock);
     }
     else
@@ -1942,19 +1943,23 @@ int getAvailableThread(int *list, int len)
 void *GRNAsMatchWrapper(void *args)
 {
   struct GRNAsMatch *args_cast = (struct GRNAsMatch *)args;
-  GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads);
+  GRNAsMatch(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType);
 
   pthread_mutex_lock(args_cast->threadInfo.lock_p);
   *(args_cast->threadInfo.numThreadsAvailable) += 1;
   *(args_cast->threadInfo.numCompleted) += 1;
-  pthread_cond_signal(args_cast->threadInfo.cond_p);
+  // pthread_cond_signal(args_cast->threadInfo.cond_p);
   if (*(args_cast->threadInfo.numCompleted) == *(args_cast->threadInfo.numElements))
   {
     pthread_cond_signal(args_cast->threadInfo.all_done_p);
+  } 
+  else 
+  {
+    pthread_cond_signal(args_cast->threadInfo.cond_p);
   }
 
   // TODO: Need to fix this issue where freeing here causes PAM identity issues
-  // freeGRNAs(args_cast->g);
+  freeGRNAs(args_cast->g);
 
   free(args_cast);
   pthread_mutex_unlock(args_cast->threadInfo.lock_p);
