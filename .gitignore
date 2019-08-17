@@ -1,5 +1,1 @@
-chr_fasta/*
 bin/*
-*.tsv
-*.bed
-*.py
