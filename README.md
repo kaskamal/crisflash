@@ -1,4 +1,4 @@
-﻿# CRISPR
+﻿# CRISFLASH
 
 Crisflash is a tool for rapid design and a potential off-target discovery tool for CRISPR/Cas9 guide RNAs. Crisflash is designed for speed, improved gRNA matching and scoring accuracy by providing the option to incorporate user-supplied variant data.
 
