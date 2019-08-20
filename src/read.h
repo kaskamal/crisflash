@@ -107,10 +107,7 @@ struct arg_struct
   long long start;
   long long end;
   char strand;
-<<<<<<< HEAD
   int splitGenome;
-=======
->>>>>>> b0642fc448c4dcef382bfbddcc1ccd1a260ef48f
 };
 
 
@@ -133,10 +130,7 @@ struct GRNAsMatch {
     int maxMismatch;
     FILE* outfh;
     int outFileType;
-<<<<<<< HEAD
     int splitGenome;
-=======
->>>>>>> b0642fc448c4dcef382bfbddcc1ccd1a260ef48f
     struct ThreadInfo threadInfo;
 };
 

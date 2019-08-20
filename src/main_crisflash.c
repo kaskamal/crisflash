@@ -296,7 +296,7 @@ int main(int argc, char **argv)
 		// Ensures memory capacity is not exceeded 
 		faread_struct *fas = installFastaReader(referenceGenomePath, upper_case_only);
 		FILE *outfh = open_file(outFile, "a");
-		while(sequenceDetectSplitGeneome(T, referenceGenomePath, pam, outfh, fas, printGRNAsOnly, splitGenome)) {
+		while(sequenceDetectSplitGenome(T, referenceGenomePath, pam, outfh, fas, printGRNAsOnly, splitGenome)) {
 			TrieAMatchSequenceThreads(T, sequencePath, maxMismatch, outfh, outFileType, pam, upper_case_only, nr_of_threads, 0, 1);
 			TrieDestroy(T);
 			T = TrieCreate(PROTOSPACER_LENGTH + strlen(pam));

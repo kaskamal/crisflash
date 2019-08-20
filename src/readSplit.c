@@ -20,7 +20,7 @@
 #include "readSplit.h"
 
 
-int sequenceDetectSplitGeneome(trie *T, char* genomefname, char* pam, FILE *outputFile, faread_struct *fas, int printGRNAsOnly, int splitGenome) {
+int sequenceDetectSplitGenome(trie *T, char* genomefname, char* pam, FILE *outputFile, faread_struct *fas, int printGRNAsOnly, int splitGenome) {
     /* Identifies all gRNAs in reference sequence and loads them to Trie. */
     grna_list *g = NULL;
     int chr_number;
