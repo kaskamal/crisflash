@@ -102,7 +102,7 @@ int mcontainer_add_str(mcontainer *m, int slen);
 void mcontainer_add_nt(mcontainer *m, mcontainer *m_new, int mpos, int seqpos, char nt, int mismatch, int max_mismatches, trieNodeTT* nodeT);
 void mcontainer_print(mcontainer *m);
 void mcontainer_print_pretty(mcontainer *m, int mismatches);
-void mcontainer_score(mcontainer *m, trie* T);
+void mcontainer_score(mcontainer *m, trie* T, int splitGenome);
 
 VCF* VCF_install(FILE* f_vcf);
 void VCF_destroy(VCF* vcf);
@@ -132,7 +132,7 @@ trieNodeT* characterFound(trieNodeT* level, char nt);
 trieNodeTT* characterFoundTerminal(trieNodeTT* levelT, char nt);
 int TrieAdd(trie* T, char* array, int alen, int chr, char strand, char mtype, char htype, int start, float score, int* identical_seq);
 int TrieMatch(trie *trie, char array[], int alen);
-mcontainer *TrieAMatch(trie *T, char array[], int alen, int nmis);
+mcontainer *TrieAMatch(trie *T, char array[], int alen, int nmis, int splitGenome);
 int TrieAMatchSummary(trie *T, char array[], int alen, int nmis);
 
 #endif

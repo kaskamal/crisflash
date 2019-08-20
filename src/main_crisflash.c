@@ -32,6 +32,7 @@ along with Crisflash.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "read.h"
 #include "vcf.h"
+#include "readSplit.h"
 
 int string_ends_with(const char * str, const char * suffix)
 {
@@ -123,12 +124,13 @@ int main(int argc, char **argv)
 	char *genome1 = NULL;
 	char *genome2 = NULL;
 	int phased;
+	int splitGenome = 0;
 
 	// default PAM sequence is 'NGG'
 	char * pam =  malloc(sizeof(char)*4);			     
 	strcpy(pam,"NGG");
 
-	while ((c = getopt(argc, argv, "ABCg:o:s:vV:m:t:uhp:")) != -1)
+	while ((c = getopt(argc, argv, "ABCg:o:s:vV:m:t:uhp:x:")) != -1)
 	  {
 	    switch (c)
 	      {		
@@ -185,14 +187,18 @@ int main(int argc, char **argv)
 		outFileType = 2;
 		break;
 	      case 'A':
-		/* Set output file type cas-offinder with additional column of variant and haplotype info*/
+		/* Set output file type cas-offinder with additional column of variant and haplotype info */
 		outFileType = 3;
 		break;
 	      case 'p':
 		free(pam);
 		pam = malloc((sizeof(char)*strlen(optarg))+1);
 		strcpy(pam, optarg);
-		break;      	
+		break;
+		  case 'x':
+		/* Set reading frequency for Trie creation */
+		splitGenome = atoi(optarg);
+		break;
 	      case '?':
 		if (isprint(optopt))
 		  {
@@ -285,7 +291,22 @@ int main(int argc, char **argv)
 	    exit(0);
 	  }
 	}
-	else {
+	else if (splitGenome) {
+		// Read fasta sequence splitGenome times and repeat until all entries have been read
+		// Ensures memory capacity is not exceeded 
+		faread_struct *fas = installFastaReader(referenceGenomePath, upper_case_only);
+		FILE *outfh = open_file(outFile, "a");
+		while(sequenceDetectSplitGeneome(T, referenceGenomePath, pam, outfh, fas, printGRNAsOnly, splitGenome)) {
+			TrieAMatchSequenceThreads(T, sequencePath, maxMismatch, outfh, outFileType, pam, upper_case_only, nr_of_threads, 0, 1);
+			TrieDestroy(T);
+			T = TrieCreate(PROTOSPACER_LENGTH + strlen(pam));
+			outfh = open_file(outFile, "a");
+		}
+		fclose(outfh);
+		TrieDestroy(T);
+		freeFastaReader(fas);
+		exit(0);
+	} else {
 	  // We have values for referene genome and sequence for target area. Therefore, we will index reference genome to Trie!
 	  readFaToTrie(T, referenceGenomePath, pam, outFile, upper_case_only,printGRNAsOnly);
 	  if(printGRNAsOnly) {
@@ -293,7 +314,8 @@ int main(int argc, char **argv)
 	  }
 	}
 	
-	TrieAMatchSequenceThreads(T, sequencePath, maxMismatch, outFile, outFileType, pam, upper_case_only, nr_of_threads,0);
+	FILE *outfh = open_file(outFile, "w");
+	TrieAMatchSequenceThreads(T, sequencePath, maxMismatch, outfh, outFileType, pam, upper_case_only, nr_of_threads,0, 0);
 
 	// We will not free Trie as the process is slow and the block of memory will be handed back to OS for freeing on exit anyway.
 	/*

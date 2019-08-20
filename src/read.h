@@ -107,6 +107,10 @@ struct arg_struct
   long long start;
   long long end;
   char strand;
+<<<<<<< HEAD
+  int splitGenome;
+=======
+>>>>>>> b0642fc448c4dcef382bfbddcc1ccd1a260ef48f
 };
 
 
@@ -129,6 +133,10 @@ struct GRNAsMatch {
     int maxMismatch;
     FILE* outfh;
     int outFileType;
+<<<<<<< HEAD
+    int splitGenome;
+=======
+>>>>>>> b0642fc448c4dcef382bfbddcc1ccd1a260ef48f
     struct ThreadInfo threadInfo;
 };
 
@@ -141,11 +149,20 @@ struct GRNAsMatch {
 void *GRNAsMatchWrapper(void *args);
 int getAvailableThread(int list[], int len);
 
-
 double now();
+FILE *open_file(char *fname, char *mode);
+int fastaReader(faread_struct *fas);
+void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch, FILE *outfh, int outFileType);
+grna_list *fastaSequenceToGRNAs(char *header, char *s, char *sr, long long spos, char *pam);
+void fastaReaderImproveSequence(faread_struct *fas);
+void freeGRNAs(grna_list *g);
+void GRNAsToTrie(trie *T, grna_list *g, int guidelen, int chr_number);
+void printGRNAs(grna_list *g, int guidelen, FILE *f);
+faread_struct * installFastaReader(char *genomefname, int no_low_complexity);
+void freeFastaReader(faread_struct *fas);
 void readFaToTrie(trie *T, char *genomefname, char *pam, char* outputfname, int upper_case_only, int printGRNAs);
 void readFaToTrieVCF(trie *T, char *genomefname1, char *genomefname2, char *pam, char* outputfname, int upper_case_only, int printGRNAs);
-void TrieAMatchSequenceThreads(trie* T, char* fname, int maxMismatch, char* outputName, int outFileType, char *pam, int upper_case_only, int threads, int printOnly);
+void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, FILE *outpuFile, int outFileType, char *pam, int uppercaseOnly, int threads, int printOnly, int splitGenome);
 
 grna_list *fastaVariantSequenceToGRNAsequences(char *header, char *s, char *sr, long long spos, char *pam);
 

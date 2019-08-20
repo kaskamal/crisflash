@@ -1561,7 +1561,7 @@ double now()
   return tv.tv_sec + tv.tv_usec / 1000000.;
 }
 
-void writeInBed_lighter(FILE *f, mcontainer *m, char *chrom, long long start, long long end, char *gRNA, char strand, trie *T)
+void writeInBed_lighter(FILE *f, mcontainer *m, char *chrom, long long start, long long end, char *gRNA, char strand, trie *T, int splitGenome)
 {
   // chrom    chromStart    chromEnd    comment(sequence gRNA /  nr of exact matches)    score    strand
   int nr_of_exact_matches = 0;
@@ -1579,7 +1579,7 @@ void writeInBed_lighter(FILE *f, mcontainer *m, char *chrom, long long start, lo
   }
   // safety net in case candidate gRNA had 0 exact matches. No exact matches is currently screwing up the scoring formula and the score
   // returned may be out of 0 to 1 bounds. Henece replacing such score with 0.
-  if (nr_of_exact_matches == 0)
+  if (nr_of_exact_matches == 0 && !splitGenome)
   {
     m->score = 0;
   }
@@ -1658,7 +1658,7 @@ void *thread_worker(void *arg)
   struct arg_struct *args_table = (struct arg_struct *)arg;
 
   // match
-  mcontainer *m = TrieAMatch(args_table->T, args_table->grna, args_table->T->readlen, args_table->maxMismatch);
+  mcontainer *m = TrieAMatch(args_table->T, args_table->grna, args_table->T->readlen, args_table->maxMismatch, args_table->splitGenome);
   if (args_table->outFileType == 2)
   {
     pthread_mutex_lock(&write_lock);
@@ -1674,7 +1674,7 @@ void *thread_worker(void *arg)
   else
   {
     pthread_mutex_lock(&write_lock);
-    writeInBed_lighter(args_table->outfh, m, args_table->chr, args_table->start, args_table->end, args_table->grna, args_table->strand, args_table->T);
+    writeInBed_lighter(args_table->outfh, m, args_table->chr, args_table->start, args_table->end, args_table->grna, args_table->strand, args_table->T, args_table->splitGenome);
     pthread_mutex_unlock(&write_lock);
   }
   // mcontainer_print(m);
@@ -1726,7 +1726,7 @@ void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch,
     // fprintf(stdout,"%s\t%lld\t%lld\t%s\t0\t%c\n", g->chr, g->starts[i], (g->starts[i]+guidelen), grna, g->strands[i]);
 
     // match grna
-    m = TrieAMatch(T, grna, T->readlen, maxMismatch);
+    m = TrieAMatch(T, grna, T->readlen, maxMismatch, 0);
     if (outFileType == 2)
     {
       pthread_mutex_lock(&write_lock);
@@ -1743,7 +1743,7 @@ void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch,
     {
       // i.e. outFileType==1; and default behaviour
       pthread_mutex_lock(&write_lock);
-      writeInBed_lighter(outfh, m, g->chr, g->starts[i], g->starts[i] + guidelen, grna, g->strands[i], T);
+      writeInBed_lighter(outfh, m, g->chr, g->starts[i], g->starts[i] + guidelen, grna, g->strands[i], T, 0);
       pthread_mutex_unlock(&write_lock);
     }
 
@@ -1752,7 +1752,7 @@ void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch,
   free(grna);
 }
 
-void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch, FILE *outfh, int outFileType, int nr_of_threads)
+void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch, FILE *outfh, int outFileType, int nr_of_threads, int splitGenome)
 {
   /** Matches each gRNA in g to trie T. The same code as in GRNAsMatch function except for additional code blocks to support multithreading **/
 
@@ -1840,6 +1840,7 @@ void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxM
         args_table[tpos].start = g->starts[i];
         args_table[tpos].end = g->starts[i] + T->readlen;
         args_table[tpos].strand = g->strands[i];
+        args_table[tpos].splitGenome = splitGenome;
         if (pthread_create(&threads[tpos], &attr, thread_worker, &args_table[tpos]))
         {
           perror("pthread_create");
@@ -1868,7 +1869,7 @@ void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxM
   free(grna);
 }
 
-void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outputName, int outFileType, char *pam, int uppercaseOnly, int threads, int printOnly)
+void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, FILE *outputFile, int outFileType, char *pam, int uppercaseOnly, int threads, int printOnly, int splitGenome)
 {
   // Initialize threads & associated variables
   pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -1889,7 +1890,7 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
   fas = installFastaReader(fname, uppercaseOnly);
   int pamlen = strlen(pam);
   int guidelen = PROTOSPACER_LENGTH + pamlen;
-  FILE *outfh = open_file(outputName, "w");
+  FILE *outfh = outputFile;
   grna_list *g;
 
   while (fastaReader(fas)) 
@@ -1921,6 +1922,7 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
       args->maxMismatch = maxMismatch;
       args->outfh = outfh;
       args->outFileType = outFileType;
+      args->splitGenome = splitGenome;
 
       // Thread info
       args->threadInfo.threads = threads;
@@ -1959,7 +1961,7 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, char *outp
 void *GRNAsMatchWrapper(void *args)
 {
   struct GRNAsMatch *args_cast = (struct GRNAsMatch *)args;
-  GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads);
+  GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads, args_cast->splitGenome);
   // GRNAsMatch(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType);
 
 

@@ -436,7 +436,7 @@ void mcontainer_print_pretty(mcontainer *m, int mismatches)
 	free(matches);
 }
 
-void mcontainer_score(mcontainer *m, trie* T)
+void mcontainer_score(mcontainer *m, trie* T, int splitGenome)
 {
 	// Calculate the off-target scores (m->off_scores table) and the gRNA score (m->score)
 	// Each off-target score corresponds to a gRNA found on the input genome
@@ -486,7 +486,10 @@ void mcontainer_score(mcontainer *m, trie* T)
 	}
 
 	// After calculating every off-target score, we calculate the gRNA score:
-	if (sum != 0) { m->score = 100. / sum; }
+	if (sum != 0) 
+	{ 
+		m->score = splitGenome? sum : 100. / sum; 
+	}
 	else { m->score = 0; }
 }
 
@@ -1146,7 +1149,7 @@ int TrieMatch(trie *trie, char array[], int alen)
 	}
 }
 
-mcontainer *TrieAMatch(trie *T, char array[], int alen, int nmis)
+mcontainer *TrieAMatch(trie *T, char array[], int alen, int nmis, int splitGenome)
 {
 	// Return a container holding information about approximative match of a sequence against the trie
 	// The sequence is in array and its length is given by alen
@@ -1247,7 +1250,7 @@ mcontainer *TrieAMatch(trie *T, char array[], int alen, int nmis)
 	}
 
 	m->matches = m->pos;
-	mcontainer_score(m, T); // calculate off-target scores and the gRNA (found in the sequence) score
+	mcontainer_score(m, T, splitGenome); // calculate off-target scores and the gRNA (found in the sequence) score
 
 	return m;
 }
@@ -1257,7 +1260,7 @@ int TrieAMatchSummary(trie *T, char array[], int alen, int nmis)
 	mcontainer *m;
 	int nrofmatches;
 
-	m = TrieAMatch(T, array, alen, nmis);
+	m = TrieAMatch(T, array, alen, nmis, 0);
 	nrofmatches = m->matches;
 
 	// print results
