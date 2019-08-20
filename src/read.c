@@ -1755,7 +1755,6 @@ void GRNAsMatch(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch,
 void GRNAsMatchThreaded(trie *T, grna_list *g, int guidelen, char *pam, int maxMismatch, FILE *outfh, int outFileType, int nr_of_threads, int splitGenome)
 {
   /** Matches each gRNA in g to trie T. The same code as in GRNAsMatch function except for additional code blocks to support multithreading **/
-
   // the loop structure for this function is identical to printGRNAs.
   long long i = 0;
   long long k;
@@ -1895,7 +1894,7 @@ void TrieAMatchSequenceThreads(trie *T, char *fname, int maxMismatch, FILE *outp
 
   while (fastaReader(fas)) 
   {
-    // fprintf(stdout,"[crisflash] Processing %s (length %lld) in %s ...\n", fas->header, fas->slen, fname);
+    fprintf(stdout,"[crisflash] Processing %s (length %lld) in %s ...\n", fas->header, fas->slen, fname);
     fflush(stderr);
     fastaReaderImproveSequence(fas);
     g = fastaSequenceToGRNAs(fas->header, fas->s, fas->sr, fas->slen, pam);
@@ -1962,8 +1961,6 @@ void *GRNAsMatchWrapper(void *args)
 {
   struct GRNAsMatch *args_cast = (struct GRNAsMatch *)args;
   GRNAsMatchThreaded(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType, args_cast->threadInfo.threads, args_cast->splitGenome);
-  // GRNAsMatch(args_cast->T, args_cast->g, args_cast->guidelen, args_cast->pam, args_cast->maxMismatch, args_cast->outfh, args_cast->outFileType);
-
 
   pthread_mutex_lock(args_cast->threadInfo.lock_p);
   *(args_cast->threadInfo.numThreadsAvailable) += 1;

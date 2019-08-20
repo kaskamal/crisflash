@@ -294,8 +294,9 @@ int main(int argc, char **argv)
 	else if (splitGenome) {
 		// Read fasta sequence splitGenome times and repeat until all entries have been read
 		// Ensures memory capacity is not exceeded 
+
 		faread_struct *fas = installFastaReader(referenceGenomePath, upper_case_only);
-		FILE *outfh = open_file(outFile, "a");
+		FILE *outfh = open_file(outFile, "w");
 		while(sequenceDetectSplitGenome(T, referenceGenomePath, pam, outfh, fas, printGRNAsOnly, splitGenome)) {
 			TrieAMatchSequenceThreads(T, sequencePath, maxMismatch, outfh, outFileType, pam, upper_case_only, nr_of_threads, 0, 1);
 			TrieDestroy(T);

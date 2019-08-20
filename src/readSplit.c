@@ -30,8 +30,10 @@ int sequenceDetectSplitGenome(trie *T, char* genomefname, char* pam, FILE *outpu
     int fastaReaderOutput = 0;
     // First check if number of headers read is >= splitGenome to prevent fastaReader(fas) from
     // running in that case
-    while (splitGenome && (fastaReaderOutput = fastaReader(fas)))
+    while (splitGenome && fastaReader(fas))
     {
+        fastaReaderOutput = 1;
+        
         fprintf(stdout,"[crisflash] Processing %s (length %lld) in %s ...\n", fas->header, fas->slen, genomefname);
         fastaReaderImproveSequence(fas);
         // faSequenceToTrie(T, fas->header, fas->s, fas->sr, fas->slen, pam, outputfname, uppercaseOnly);
