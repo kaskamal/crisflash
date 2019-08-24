@@ -65,6 +65,7 @@ Returns all gRNA sequences in genome for PAM sequence 'NNNRYAC'.
 -m INT        Number of mismatches allowed. Default: 2.
 -t INT        Number of threads to use for off-target validation. Default: 1.
 -u 	      Excludes low complexity / soft masked genomic sequences (lowercase) from off-target search.
+-x INT        Number of FASTA entries to use at once when running through the program. Prevents overloading memory.
 -h    	      Print help.
 -v    	      Print version.
 ```
